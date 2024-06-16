@@ -29,7 +29,7 @@ export const mainRoutes = [
         title: "Геолокация фото"
       },
       {
-        path: "/travel/labs/image-locations/",
+        path: "/travel/labs/image-geo-tags/",
         exact: true,
         params: {"lang": "ru"},
         component: HomeContainer,
@@ -37,12 +37,12 @@ export const mainRoutes = [
         title: "Геолокация фото"
       },
       {
-        path: "/en/travel/labs/image-locations/",
+        path: "/en/travel/labs/image-geo-tags/",
         params: {"lang": "en"},
         exact: true,
         component: HomeContainer,
         name: "home-en",
-        title: "Image Locations"
+        title: "Image geo tags"
       },
       {
         component: NoMatch,

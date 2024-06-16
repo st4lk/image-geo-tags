@@ -110,7 +110,7 @@ const i18n = {
     'upload_gpx': 'Upload GPX File',
     'gpx_no_time': 'No time in GPX file',
     'adopt_for_strava': 'Adopt for Strava',
-    'strava_loc_1': "For some reason Strava doesn't recognize image locations set by current tool. It can be fixed by script ",
+    'strava_loc_1': "For some reason Strava doesn't recognize image geo tags set by current tool. It can be fixed by script ",
   },
 }
 
