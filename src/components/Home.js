@@ -105,12 +105,21 @@ const i18n = {
     'gpx_no_time': 'В GPX файле нет временных отметок',
     'adopt_for_strava': 'Адаптировать для Strava',
     'strava_loc_1': 'По каким-то причинам, Strava не распознает локации у фото, проставленные здесь. Это можно исправить скриптом ',
+    'strava_loc_2': (downloadLinkTitle) => <p>Нужно скачать изображения с этого сайта (кнопка "{downloadLinkTitle}"). Положить в папку <code>images</code> рядом со скриптом и запустить. Должна быть установлена утилита <a href="https://exiftool.org/">exiftool</a></p>,
+    'strava_loc_3': 'Чтобы фото отображались на карте в strava, они должны быть загружены через мобильное приложение. Если вы загрузите их в браузере - на карте они не отобразятся, даже если в фото есть гео метки.',
+    'upload_photos': 'Загрузить фото (можно несколько)',
+    'download_with_locations': 'Скачать все (с локациями)',
   },
   'en': {
     'upload_gpx': 'Upload GPX File',
     'gpx_no_time': 'No time in GPX file',
     'adopt_for_strava': 'Adopt for Strava',
     'strava_loc_1': "For some reason Strava doesn't recognize image geo tags set by current tool. It can be fixed by script ",
+    'strava_loc_2': (downloadLinkTitle) => <p>Need to download images from this app ("{downloadLinkTitle}" button). Put them into folder <code>images</code> next to the script and run it. Tool <a href="https://exiftool.org/">exiftool</a> must be set up.</p>,
+    'strava_loc_3': 'Чтобы фото отображались на карте в strava, они должны быть загружены через мобильное приложение. Если вы загрузите их в браузере - на карте они не отобразятся, даже если в фото есть гео метки.',
+    'strava_loc_3': "To show images on strava map, they must by uploaded through strava mobile app. Uploading from desktop version won't work, even if images have correct geo tags.",
+    'upload_photos': 'Upload images (multiple supported)',
+    'download_with_locations': 'Download all (with geo tags)',
   },
 }
 
@@ -486,7 +495,7 @@ class Home extends Component {
       stavaActivityURL,
     } = this.state;
 
-    const downloadLinkTitle = 'Скачать все (с локациями)';
+    const downloadLinkTitle = this.getI18n('download_with_locations');
 
     return (
       <div className={classes.homeRoot}>
@@ -497,7 +506,7 @@ class Home extends Component {
           </div>
           {gpxValidationError && <div className={classes.errorMsg}>{gpxValidationError}</div>}
           <hr />
-          <div>Загрузить фото (можно несколько)</div>
+          <div>{this.getI18n('upload_photos')}</div>
           <div>
             <input
               type='file'
@@ -554,12 +563,10 @@ class Home extends Component {
             <div>
               {this.getI18n('strava_loc_1')} <code>fix_imgloc.sh</code>:
               <pre><PreFormattedCode /></pre>
-              Нужно скачать изображения с этого сайта (кнопка "{downloadLinkTitle}"). Положить в папку <code>images</code> рядом со скриптом и запустить.
-              Должна быть установлена утилита <a href="https://exiftool.org/">exiftool</a>.
+              {this.getI18n('strava_loc_2')(downloadLinkTitle)}
             </div>
             <div>
-              Чтобы фото отображались на карте в strava, они должны быть загружены через мобильное приложение.
-              Если вы загрузите их в браузере - на карте они не отобразятся, даже если в фото есть гео метки.
+              {this.getI18n('strava_loc_3')}
             </div>
           </Collapse>
         </Paper>

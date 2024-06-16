@@ -29,6 +29,13 @@ export const mainRoutes = [
         title: "Геолокация фото"
       },
       {
+        path: "/en/",
+        exact: true,
+        component: HomeContainer,
+        name: "home-en",
+        title: "Image geo tags"
+      },
+      {
         path: "/travel/labs/image-geo-tags/",
         exact: true,
         params: {"lang": "ru"},
