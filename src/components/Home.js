@@ -115,7 +115,7 @@ const i18n = {
     'gpx_no_time': 'No time in GPX file',
     'adopt_for_strava': 'Adopt for Strava',
     'strava_loc_1': "For some reason Strava doesn't recognize image geo tags set by current tool. It can be fixed by script ",
-    'strava_loc_2': (downloadLinkTitle) => <p>Need to download images from this app ("{downloadLinkTitle}" button). Put them into folder <code>images</code> next to the script and run it. Tool <a href="https://exiftool.org/">exiftool</a> must be set up.</p>,
+    'strava_loc_2': (downloadLinkTitle) => <p>Need to download images from this app ("{downloadLinkTitle}" button). Put them into folder <code>images</code> next to the script and run it. Tool <a href="https://exiftool.org/">exiftool</a> must be installed.</p>,
     'strava_loc_3': 'Чтобы фото отображались на карте в strava, они должны быть загружены через мобильное приложение. Если вы загрузите их в браузере - на карте они не отобразятся, даже если в фото есть гео метки.',
     'strava_loc_3': "To show images on strava map, they must by uploaded through strava mobile app. Uploading from desktop version won't work, even if images have correct geo tags.",
     'upload_photos': 'Upload images (multiple supported)',
@@ -206,7 +206,7 @@ class Home extends Component {
 
   validateGPXData = (gpxData) => {
     const gpxPoints = this.getGPXPoints(gpxData);
-    if (!gpxPoints[0].time) {
+    if (!gpxPoints || !gpxPoints.length || !gpxPoints[0].time) {
       this.setState({
         isGPXValid: false,
         gpxValidationError: this.getI18n('gpx_no_time'),
@@ -502,7 +502,7 @@ class Home extends Component {
         <Paper elevation={4} className={classes.greetings}>
           <div>{this.getI18n('upload_gpx')}</div>
           <div>
-            <input type='file' accept='application/xml, application/gpx' onChange={this.onTrackChange} /> 
+            <input type='file' accept='.gpx' onChange={this.onTrackChange} /> 
           </div>
           {gpxValidationError && <div className={classes.errorMsg}>{gpxValidationError}</div>}
           <hr />
