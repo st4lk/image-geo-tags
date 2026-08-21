@@ -5,8 +5,6 @@ import classNames from 'classnames';
 import Button from "@material-ui/core/Button";
 import Paper from "@material-ui/core/Paper";
 import CircularProgress from '@material-ui/core/CircularProgress';
-import TextField from '@material-ui/core/TextField';
-import Link from '@material-ui/core/Link';
 import {saveAs} from 'file-saver';
 import piexif from 'piexifjs';
 import xmlJS from 'xml-js';
@@ -117,7 +115,7 @@ const i18n = {
     'upload_photos': 'Upload images (multiple supported)',
     'download_with_locations': 'Download all (with geo tags)',
   },
-}
+};
 
 
 class Home extends Component {
@@ -189,12 +187,12 @@ class Home extends Component {
       this.setState({
         isGPXValid: false,
         gpxValidationError: this.getI18n('gpx_no_time'),
-      })
+      });
     } else {
       this.setState({
         isGPXValid: true,
         gpxValidationError: null,
-      })
+      });
     }
   }
 
@@ -477,7 +475,6 @@ class Home extends Component {
       trackGPXFile,
       isGPXValid,
       gpxValidationError,
-      stavaActivityURL,
     } = this.state;
 
     const downloadLinkTitle = this.getI18n('download_with_locations');
@@ -549,6 +546,7 @@ class Home extends Component {
 
 Home.propTypes = {
   classes: PropTypes.object.isRequired,
+  match: PropTypes.object.isRequired,
 };
 
 export default withStyles(styles)(Home);

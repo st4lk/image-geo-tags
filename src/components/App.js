@@ -4,8 +4,6 @@ import {renderRoutes} from "react-router-config";
 import {MuiThemeProvider, createMuiTheme, withStyles} from "@material-ui/core/styles";
 import {deepOrange} from "@material-ui/core/colors";
 
-import AppBar from "./inline/AppBar";
-
 const theme = createMuiTheme({
   palette: {
     primary: deepOrange,  // App bar color (indigo by default)
@@ -46,7 +44,7 @@ const styles = () => ({
 class App extends Component {
 
   render() {
-    const {classes, route} = this.props;
+    const {route} = this.props;
 
     let content = null;
     content = renderRoutes(route.routes);

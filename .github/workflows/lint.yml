@@ -1,0 +1,22 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # linting doesn't need the native modules to be built
+      - run: npm ci --ignore-scripts
+
+      - run: npm run lint
