@@ -5,18 +5,17 @@ import classNames from 'classnames';
 import Button from "@material-ui/core/Button";
 import Paper from "@material-ui/core/Paper";
 import CircularProgress from '@material-ui/core/CircularProgress';
-import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
-import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import TextField from '@material-ui/core/TextField';
 import Link from '@material-ui/core/Link';
-import Collapse from '@material-ui/core/Collapse';
 import {saveAs} from 'file-saver';
-import modifyExif from 'modify-exif';
+import piexif from 'piexifjs';
 import xmlJS from 'xml-js';
 import {parse as parseDate, parseISO as parseISODate} from 'date-fns';
 import DmsCoordinates from 'dms-conversion';
 
 import {withStyles} from "@material-ui/core/styles";
+
+import {normalizeExifBytes} from "../exifNormalize";
 
 const URL_REGEX = new RegExp(/(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi);
 
@@ -95,6 +94,10 @@ const styles = theme => ({
 
   errorMsg: {
     color: "red",
+  },
+
+  stravaNote: {
+    marginTop: "15px",
   }
 
 });
@@ -103,9 +106,6 @@ const i18n = {
   'ru': {
     'upload_gpx': 'Загрузить GPX файл',
     'gpx_no_time': 'В GPX файле нет временных отметок',
-    'adopt_for_strava': 'Адаптировать для Strava',
-    'strava_loc_1': 'По каким-то причинам, Strava не распознает локации у фото, проставленные здесь. Это можно исправить скриптом ',
-    'strava_loc_2': (downloadLinkTitle) => <p>Нужно скачать изображения с этого сайта (кнопка "{downloadLinkTitle}"). Положить в папку <code>images</code> рядом со скриптом и запустить. Должна быть установлена утилита <a href="https://exiftool.org/">exiftool</a></p>,
     'strava_loc_3': 'Чтобы фото отображались на карте в strava, они должны быть загружены через мобильное приложение. Если вы загрузите их в браузере - на карте они не отобразятся, даже если в фото есть гео метки.',
     'upload_photos': 'Загрузить фото (можно несколько)',
     'download_with_locations': 'Скачать все (с локациями)',
@@ -113,30 +113,10 @@ const i18n = {
   'en': {
     'upload_gpx': 'Upload GPX File',
     'gpx_no_time': 'No time in GPX file',
-    'adopt_for_strava': 'Adopt for Strava',
-    'strava_loc_1': "For some reason Strava doesn't recognize image geo tags set by current tool. It can be fixed by script ",
-    'strava_loc_2': (downloadLinkTitle) => <p>Need to download images from this app ("{downloadLinkTitle}" button). Put them into folder <code>images</code> next to the script and run it. Tool <a href="https://exiftool.org/">exiftool</a> must be installed.</p>,
-    'strava_loc_3': 'Чтобы фото отображались на карте в strava, они должны быть загружены через мобильное приложение. Если вы загрузите их в браузере - на карте они не отобразятся, даже если в фото есть гео метки.',
     'strava_loc_3': "To show images on strava map, they must by uploaded through strava mobile app. Uploading from desktop version won't work, even if images have correct geo tags.",
     'upload_photos': 'Upload images (multiple supported)',
     'download_with_locations': 'Download all (with geo tags)',
   },
-}
-
-
-const bashCode = `#!/bin/bash
-
-for file in $(dirname "$0")/images/*
-do
-  exiftool -all= -tagsfromfile $\{file} -all:all -unsafe -exifbyteorder=little-endian $\{file}
-  rm $\{file}_original
-done
-`
-
-class PreFormattedCode extends React.Component {
-    render() {
-      return <React.Fragment>{bashCode}</React.Fragment>
-    }
 }
 
 
@@ -149,7 +129,6 @@ class Home extends Component {
     trackGPXData: null,
     isGPXValid: false,
     gpxValidationError: null,
-    adoptForStravaExpand: false,
     stavaActivityURL: '',
     stravaURLLoadiong: false,
     stravaActivityURLFromPopup: '',
@@ -322,72 +301,85 @@ class Home extends Component {
     await saveAs(imageData.blob, imageData.file.name);  // TODO: uncomment me
   }
 
+  setGPSFromTrack = (exifData, imageData) => {
+
+    // exifData.GPS - is an object, but keys are integers (like array).
+    // Examples for '/Users/stalk/Pictures/2020.10.10 Velo Tugolesie - Shaturtorf/good/IMG_8067.JPG'
+
+    const GPSVersion = 0;  // [2, 3, 0, 0]
+    const GPSLatitudeSide = 1;  // "N"
+    const GPSLatitudeValue = 2;  // [[55, 1], [23, 1], [5883, 1000]]
+    const GPSLongitudeSide = 3;  // "E"
+    const GPSLongitudeValue = 4;  // [[39, 1], [20, 1], [14793, 1000]]
+    // const GPSWTF = 5;  // 0  (probable it is "Altitude Reference", 0 means "above sea level")
+    // const GPSAltitude = 6;  // [1461, 10]
+    // const GPSTime = 7;  // [[11, 1], [2, 1], [52000, 1000]]
+    // const GPSStatus = 9;  // "A"
+    // const GPSMapDatum = 18;  // "WGS-84"
+    // const GPSDate = 29;  // "2020:10:10"
+
+    const EXIF_DateTimeOriginal = 36867;
+
+    const dateTimeOriginal = exifData.Exif[EXIF_DateTimeOriginal];
+
+    // TODO: respect elevation somehow
+    // eslint-disable-next-line no-unused-vars
+    const [lat, lon, elevation] = this.findCoordinateForTime(this.state.trackGPXData, dateTimeOriginal);
+    if (!lat || !lon) {
+      console.log(`Ooops, looks like image ${imageData.file.name} wasn't taken during the track time.`);
+      return null;
+    }
+
+    // TODO apply convertGPXDecimalToDegree for lat and lon
+    const decimalLat = Number.parseFloat(lat);
+    const decimalLon = Number.parseFloat(lon);
+    const [dmsLat, dmsLon] = this.convertGPXDecimalToDegree(decimalLat, decimalLon);
+
+    // Modify the file
+    exifData.GPS = exifData.GPS || {};
+    // set GPS version
+    exifData.GPS[GPSVersion] = [2, 0, 0, 0];
+    // latitude
+    const latitudeSide = dmsLat.direction;
+    const latitudeValue = [[dmsLat.degree, 1], [dmsLat.minute, 1], [dmsLat.millisecond, 1000]];
+    console.log('Applying latitude', latitudeSide, latitudeValue);
+    exifData.GPS[GPSLatitudeSide] = latitudeSide;
+    exifData.GPS[GPSLatitudeValue] = latitudeValue;
+    // longitue
+    const longitudeSide = dmsLon.direction;
+    const longitudeValue = [[dmsLon.degree, 1], [dmsLon.minute, 1], [dmsLon.millisecond, 1000]];
+    console.log('Applying longitude', longitudeSide, longitudeValue);
+    exifData.GPS[GPSLongitudeSide] = longitudeSide;
+    exifData.GPS[GPSLongitudeValue] = longitudeValue;
+
+    return [decimalLat, decimalLon];
+  }
+
   assignLocation = (imageData, imageIndex) => {
     return new Promise((resolve) => {
       console.log('Processing image', imageIndex);
       const reader = new FileReader();
       reader.onload = (e) => {
-        const arrayBuffer = e.target.result;
-        const imageBuffer = Buffer.from(arrayBuffer);
-        let decimalLat;
-        let decimalLon;
+        const imageStr = Buffer.from(e.target.result).toString('binary');
 
-        const newImage = modifyExif(imageBuffer, data => {
+        let newImageBlob = null;
+        let location = null;
 
-          // data.GPS - is an object, but keys are integers (like array).
-          // Examples for '/Users/stalk/Pictures/2020.10.10 Velo Tugolesie - Shaturtorf/good/IMG_8067.JPG'
+        try {
+          const exifData = piexif.load(imageStr);
+          location = this.setGPSFromTrack(exifData, imageData);
 
-          const GPSVersion = 0;  // [2, 3, 0, 0]
-          const GPSLatitudeSide = 1;  // "N"
-          const GPSLatitudeValue = 2;  // [[55, 1], [23, 1], [5883, 1000]]
-          const GPSLongitudeSide = 3;  // "E"
-          const GPSLongitudeValue = 4;  // [[39, 1], [20, 1], [14793, 1000]]
-          // const GPSWTF = 5;  // 0  (probable it is "Altitude Reference", 0 means "above sea level")
-          // const GPSAltitude = 6;  // [1461, 10]
-          // const GPSTime = 7;  // [[11, 1], [2, 1], [52000, 1000]]
-          // const GPSStatus = 9;  // "A"
-          // const GPSMapDatum = 18;  // "WGS-84"
-          // const GPSDate = 29;  // "2020:10:10"
+          // piexifjs writes an Exif layout that strict readers (Strava,
+          // iOS Photos) refuse to parse, normalizeExifBytes() puts it in order
+          const exifBytes = normalizeExifBytes(piexif.dump(exifData));
+          const newImage = Buffer.from(piexif.insert(exifBytes, imageStr), 'binary');
 
-          const EXIF_DateTimeOriginal = 36867;
-
-          const dateTimeOriginal = data.Exif[EXIF_DateTimeOriginal];
-
-          // TODO: respect elevation somehow
-          // eslint-disable-next-line no-unused-vars
-          const [lat, lon, elevation] = this.findCoordinateForTime(this.state.trackGPXData, dateTimeOriginal);
-          if (lat && lon) {
-            // TODO apply convertGPXDecimalToDegree for lat and lon
-            decimalLat = Number.parseFloat(lat);
-            decimalLon = Number.parseFloat(lon);
-            const [dmsLat, dmsLon] = this.convertGPXDecimalToDegree(decimalLat, decimalLon);
-
-            // Modify the file
-            data.GPS = data.GPS || {};
-            // set GPS version
-            data.GPS[GPSVersion] = [2, 0, 0, 0];
-            // latitude
-            const latitudeSide = dmsLat.direction;
-            const latitudeValue = [[dmsLat.degree, 1], [dmsLat.minute, 1], [dmsLat.millisecond, 1000]];
-            console.log('Applying latitude', latitudeSide, latitudeValue);
-            data.GPS[GPSLatitudeSide] = latitudeSide;
-            data.GPS[GPSLatitudeValue] = latitudeValue;
-            // longitue
-            const longitudeSide = dmsLon.direction;
-            const longitudeValue = [[dmsLon.degree, 1], [dmsLon.minute, 1], [dmsLon.millisecond, 1000]];
-            console.log('Applying longitude', longitudeSide, longitudeValue);
-            data.GPS[GPSLongitudeSide] = longitudeSide;
-            data.GPS[GPSLongitudeValue] = longitudeValue;
-          } else {
-            console.log(`Ooops, looks like image ${imageData.file} wasn't taken during the track time.`);
-          }
-        }, {'keepDateTime': true});
-
-        const newImageBlob = new Blob([newImage], {
-          type: imageData.file.type,
-        });
-
-        const location = (decimalLon && decimalLon) ? [decimalLat, decimalLon] : null;
+          newImageBlob = new Blob([newImage], {
+            type: imageData.file.type,
+          });
+        } catch (error) {
+          console.error(`Can not write geo tags into ${imageData.file.name}`, error);
+        }
 
         this.updateImageInState(
           imageIndex,
@@ -433,12 +425,6 @@ class Home extends Component {
       // Not very robust, but it seems working.
       await this.timeout(1000);
     }
-  }
-
-  handleStravaCollapse = () => {
-    this.setState({
-      adoptForStravaExpand: !this.state.adoptForStravaExpand,
-    });
   }
 
   handleStavaActivityURLChange = (event) => {
@@ -491,7 +477,6 @@ class Home extends Component {
       trackGPXFile,
       isGPXValid,
       gpxValidationError,
-      adoptForStravaExpand,
       stavaActivityURL,
     } = this.state;
 
@@ -553,22 +538,9 @@ class Home extends Component {
               {downloadLinkTitle}
             </Button>
           </div>
-          <Button
-            size="small"
-            // disabled={!trackGPXFile || !imageList.length}
-            onClick={this.handleStravaCollapse} >
-            {this.getI18n('adopt_for_strava')} {adoptForStravaExpand ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-          </Button>
-          <Collapse in={adoptForStravaExpand}>
-            <div>
-              {this.getI18n('strava_loc_1')} <code>fix_imgloc.sh</code>:
-              <pre><PreFormattedCode /></pre>
-              {this.getI18n('strava_loc_2')(downloadLinkTitle)}
-            </div>
-            <div>
-              {this.getI18n('strava_loc_3')}
-            </div>
-          </Collapse>
+          <div className={classes.stravaNote}>
+            {this.getI18n('strava_loc_3')}
+          </div>
         </Paper>
       </div>
     );
